@@ -1,8 +1,8 @@
-# Mapping Copilot — a case study in making AI output safe enough to trust
+# Mapping Copilot: a case study in making AI output safe enough to trust
 
 An AI copilot that turns a legacy healthcare feed into a reviewable, deterministic integration mapping, so a vertical SaaS vendor can onboard a new EHR customer in days instead of months.
 
-Working proof of concept, synthetic data only, zero real patient data ever. The code is private. This repo is the write-up.
+Mapping Copilot is the AI feature inside Plumb, an integration platform you can try in the browser at [integrationplatform.vercel.app](https://integrationplatform.vercel.app). Synthetic data only, zero real patient data ever. The code is private. This repo is the write-up.
 
 ---
 
@@ -24,19 +24,23 @@ So the model's job ends before production begins. It writes an artifact. The art
 
 ## The number that matters
 
-Across ten synthetic feeds, every mapping scored against machine-readable ground truth:
+Every mapping is scored against machine readable ground truth across ten synthetic HL7 feeds. Three runs, labelled for what they are:
 
-| Metric | Result |
-|---|---|
-| Silent error rate | **0%** |
-| Error-surfacing rate | **100%** (220 of 220 incorrect fields caught) |
-| Field accuracy | 91% (clean feeds ~95%, worst feed 77%) |
+| Run | Silent errors | Wrong fields surfaced | Field accuracy | Held for review |
+|---|---|---|---|---|
+| Offline reference mapper: a pipeline check with no model | **0%** | **100%** (220 of 220) | 91% | Not reported |
+| Live model, calibrated, on a fresh run never used for tuning | **0.5%** (4.7% with the model's own confidence) | **99%** (87% raw) | about 63 to 65% | 46% |
+| Live model, CSV census exports, same calibration | **0.5%** | **100%** | 91% | 18% |
+
+The first row checks that the pipeline, the review gate and the scoring work, without any AI in the loop. The second and third rows are the live model.
 
 Accuracy is the number people ask for. It is not the number that matters.
 
-A wrong value that nobody flagged is the only failure that reaches a live system unnoticed. Everything else is a delay: a flagged field costs an analyst two minutes, a failed validation costs a re-run. A silently wrong diet order on a patient with an allergy is a different category of event.
+A wrong value that nobody flagged is the only failure that reaches a live system unnoticed. Everything else is a delay: a flagged field costs an analyst two minutes, a failed validation costs a re run. A silently wrong diet order on a patient with an allergy is a different category of event.
 
-So the product is not optimised for accuracy. It is optimised so that when the model is wrong, the wrongness is visible. 91% accuracy with 0% silent errors is a shippable system. 97% accuracy with 3% silent errors is not.
+So the product is not optimised for accuracy. It is optimised so that when the model is wrong, the wrongness is visible. The live model's own confidence turned out to be overconfident: on its raw scores it auto accepted wrong fields 4.7% of the time. Replacing that score with evidence based calibration, built from signals measurable without ground truth, brought silent errors to 0.5% on feeds it never saw. Calibration changes which errors a person sees, not how many the model makes.
+
+What calibration does not fix: the remaining silent errors are one plausible looking pattern in a single feed, where the model reversed the component order of a combined location string. Running the model five times and voting does not catch it either; most wrong mappings are unanimous across runs.
 
 The full measurement design, including how the benchmark is built so I cannot fool myself with it, is in [docs/measurement.md](docs/measurement.md).
 
